@@ -9,7 +9,7 @@ Test that unknown command-line arguments are detected:
 Usage: install.sh [VERSION] [options]
 
 Install a given version of the Dune binary distribution, or the latest stable version if VERSION is not specified.
-Existing versions are listed at: https://github.com/ocaml-dune/dune-bin/releases
+Existing versions are listed at: https://github.com/gridbugs/dune-bin/releases
 To install an unstable version (such as an alpha version) the version number must be specified explicitly.
 
 Options:

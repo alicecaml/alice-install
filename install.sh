@@ -7,7 +7,7 @@ set -eu
 # downloaded script does not get executed by accident. The function is called
 # at the end.
 main () {
-    dune_bin_git_url="https://github.com/ocaml-dune/dune-bin"
+    dune_bin_git_url="https://github.com/gridbugs/dune-bin"
 
     # Reset
     Color_Off='\033[0m' # Text Reset
