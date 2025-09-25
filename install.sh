@@ -200,7 +200,7 @@ main () {
     }
 
     exit_message() {
-        info_bold "This installer will now exit."
+        info_bold "This installer will now exit. Restart your shell to get access to new commands."
     }
 
     usage() {
@@ -213,6 +213,9 @@ main () {
         echo "Options:"
         echo "--help, -h                Print this help message"
         echo "--no-prompt               Don't prompt before installing"
+        echo "--install-tools           Install OCaml development tools"
+        echo "--no-install-tools        Don't install OCaml development tools"
+        echo "--install-compiler-only   When installing OCaml development tools, only install the compiler"
         echo "--update-shell-config     Always update the shell config (e.g. .bashrc) if necessary"
         echo "--no-update-shell-config  Never update the shell config (e.g. .bashrc)"
         echo "--shell-config PATH       Use this file as your shell config when updating the shell config"
@@ -228,6 +231,8 @@ main () {
     just_print_version="0"
     tty="1"
     prompt="y"
+    install_tools=""
+    install_compiler_only="n"
     while [ "$#" -gt "0" ]; do
         arg="$1"
         shift
@@ -238,6 +243,15 @@ main () {
                 ;;
             --no-prompt)
                 prompt="n"
+                ;;
+            --install-tools)
+                install_tools="y"
+                ;;
+            --no-install-tools)
+                install_tools="n"
+                ;;
+            --install-compiler-only)
+                install_compiler_only="y"
                 ;;
             --update-shell-config)
                 should_update_shell_config="y"
@@ -397,10 +411,14 @@ main () {
         cp -rf "$d" "$install_root/alice"
     done
 
+    # Run alice itself to install some extra scripts.
+    "$install_root/alice/bin/alice" internal setup
+
     echo
     success "Alice successfully installed to $install_root!"
     echo
     echo
+
 
     if [ "$should_update_shell_config" = "n" ]; then
         # The remainder of the install script deals with updating the shell
@@ -506,24 +524,30 @@ main () {
         echo
         shell_config_code
         echo
-        exit_message
+    else
+        info "To run 'alice' from your terminal, you'll need to add the following lines to your shell config file ($shell_config):"
         echo
-        exit 0
+        shell_config_code
+        echo
+
+        if [ "$should_update_shell_config" = "y" ] || y_or_n "Would you like these lines to be appended to $shell_config?"; then
+            mkdir -p "$(dirname "$shell_config")"
+            shell_config_code >> "$shell_config"
+            echo
+            success "Added Alice setup commands to $shell_config!"
+            echo
+            info "Restart your terminal for the changes to take effect."
+            echo
+        fi
     fi
 
-    info "To run 'alice' from your terminal, you'll need to add the following lines to your shell config file ($shell_config):"
-    echo
-    shell_config_code
-    echo
-
-    if [ "$should_update_shell_config" = "y" ] || y_or_n "Would you like these lines to be appended to $shell_config?"; then
-        mkdir -p "$(dirname "$shell_config")"
-        shell_config_code >> "$shell_config"
-        echo
-        success "Added Alice setup commands to $shell_config!"
-        echo
-        info "Restart your terminal for the changes to take effect."
-        echo
+    if ! [ "$install_tools" = "n" ] && ([ "$install_tools" = "y" ] || y_or_n "Would you like to install the OCaml compiler, ocamllsp, and ocamlformat?"); then
+        echo "Alice will now install tools to '$install_root/current/bin'..."
+        if [ "$install_compiler_only" = "y" ]; then
+            "$install_root/alice/bin/alice" tools get --compiler-only
+        else
+            "$install_root/alice/bin/alice" tools get
+        fi
     fi
 
     exit_message
