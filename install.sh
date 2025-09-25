@@ -420,124 +420,118 @@ main () {
     echo
 
 
-    if [ "$should_update_shell_config" = "n" ]; then
-        # The remainder of the install script deals with updating the shell
-        # config file. If the user indicated by command-line option that they
-        # don't wish to do this, exit now.
-        exit_message
-        echo
-        exit 0
-    fi
+    if [ "$should_update_shell_config" = "y" ]; then
 
-    shell_name=${shell_name:-$(infer_shell_name)}
-    env_dir="$install_root/env"
-    case "$shell_name" in
-        sh|ash|dash)
-            shell_config_inferred="${shell_config:-$HOME/.profile}"
-            env_file="$env_dir/env.sh"
-            ;;
-        bash)
-            shell_config_inferred="${shell_config:-$HOME/.profile}"
-            env_file="$env_dir/env.bash"
-            ;;
-        zsh)
-            env_file="$env_dir/env.zsh"
-            shell_config_inferred="$HOME/.zshrc"
-            ;;
-        fish)
-            env_file="$env_dir/env.fish"
-            shell_config_inferred="$HOME/.config/fish/config.fish"
-            ;;
-        *)
-            info "The install script does not recognize your shell ($shell_name)."
-            echo
-            info "It's up to you to ensure $install_root/alice/bin is in your \$PATH variable."
-            echo
-            exit_message
-            echo
-            exit 0
-            ;;
-    esac
-
-    if [ -z "${shell_config+x}" ]; then
-        info "The installer can modify your shell config file to set up your environment for running 'alice' from your terminal."
-        echo
-        info "The installer has inferred that your shell is: $shell_name. If this is incorrect, rerun the installer with --shell."
-        echo
-        info "Based on your shell ($shell_name) the installer has inferred that your shell config file is: $shell_config_inferred"
-        echo
-        while [ -z "${shell_config+x}" ]; do
-            echo
-            info "Enter the absolute path of your shell config file or leave blank for default (no modification will be performed yet):"
-            echo
-            info_bold "[$shell_config_inferred] >"
-            choice=$(read_checked "$tty")
-            case "$choice" in
-                "")
-                    shell_config=$shell_config_inferred
-                    ;;
-                '~'/*)
-                    shell_config=$(echo "$choice" | sed "s#~#$HOME#")
-                    echo
-                    warn "Expanding $choice to $shell_config"
-                    ;;
-                /*)
-                    shell_config=$choice
-                    ;;
-                *)
-                    echo
-                    warn "Not an absolute path: $choice"
-                    ;;
-            esac
-        done
-        echo
-    fi
-
-    shell_config_code() {
+        shell_name=${shell_name:-$(infer_shell_name)}
+        env_dir="$install_root/env"
         case "$shell_name" in
+            sh|ash|dash)
+                shell_config_inferred="${shell_config:-$HOME/.profile}"
+                env_file="$env_dir/env.sh"
+                ;;
+            bash)
+                shell_config_inferred="${shell_config:-$HOME/.profile}"
+                env_file="$env_dir/env.bash"
+                ;;
+            zsh)
+                env_file="$env_dir/env.zsh"
+                shell_config_inferred="$HOME/.zshrc"
+                ;;
             fish)
-                if_installed="if [ -f \"$(unsubst_home "$env_file")\" ]"
-                end_if="end"
+                env_file="$env_dir/env.fish"
+                shell_config_inferred="$HOME/.config/fish/config.fish"
                 ;;
             *)
-                if_installed="if [ -f \"$(unsubst_home "$env_file")\" ]; then"
-                end_if="fi"
+                info "The install script does not recognize your shell ($shell_name)."
+                echo
+                info "It's up to you to ensure $install_root/alice/bin is in your \$PATH variable."
+                echo
+                exit_message
+                echo
+                exit 0
                 ;;
         esac
 
-        code ""
-        code "# BEGIN configuration from Alice installer"
-        code "$if_installed"
-        # Use `.` rather than `source` because the former is more portable.
-        code "    . \"$(unsubst_home "$env_file")\""
-        code "$end_if"
-        code "# END configuration from Alice installer"
-    }
+        if [ -z "${shell_config+x}" ]; then
+            info "The installer can modify your shell config file to set up your environment for running 'alice' from your terminal."
+            echo
+            info "The installer has inferred that your shell is: $shell_name. If this is incorrect, rerun the installer with --shell."
+            echo
+            info "Based on your shell ($shell_name) the installer has inferred that your shell config file is: $shell_config_inferred"
+            echo
+            while [ -z "${shell_config+x}" ]; do
+                echo
+                info "Enter the absolute path of your shell config file or leave blank for default (no modification will be performed yet):"
+                echo
+                info_bold "[$shell_config_inferred] >"
+                choice=$(read_checked "$tty")
+                case "$choice" in
+                    "")
+                        shell_config=$shell_config_inferred
+                        ;;
+                    '~'/*)
+                        shell_config=$(echo "$choice" | sed "s#~#$HOME#")
+                        echo
+                        warn "Expanding $choice to $shell_config"
+                        ;;
+                    /*)
+                        shell_config=$choice
+                        ;;
+                    *)
+                        echo
+                        warn "Not an absolute path: $choice"
+                        ;;
+                esac
+            done
+            echo
+        fi
 
-    if [ -f "$shell_config" ] && match=$(grep -Hn "$(unsubst_home "$env_file" | sed 's#\$#\\$#')" "$shell_config"); then
-        info "It appears your shell config file ($shell_config) is already set up correctly as it contains the line:"
-        echo
-        info "$match"
-        echo
-        echo
-        info "Just in case it isn't, here are the lines that need run when your shell starts to initialize Alice:"
-        echo
-        shell_config_code
-        echo
-    else
-        info "To run 'alice' from your terminal, you'll need to add the following lines to your shell config file ($shell_config):"
-        echo
-        shell_config_code
-        echo
+        shell_config_code() {
+            case "$shell_name" in
+                fish)
+                    if_installed="if [ -f \"$(unsubst_home "$env_file")\" ]"
+                    end_if="end"
+                    ;;
+                *)
+                    if_installed="if [ -f \"$(unsubst_home "$env_file")\" ]; then"
+                    end_if="fi"
+                    ;;
+            esac
 
-        if [ "$should_update_shell_config" = "y" ] || y_or_n "Would you like these lines to be appended to $shell_config?"; then
-            mkdir -p "$(dirname "$shell_config")"
-            shell_config_code >> "$shell_config"
+            code ""
+            code "# BEGIN configuration from Alice installer"
+            code "$if_installed"
+            # Use `.` rather than `source` because the former is more portable.
+            code "    . \"$(unsubst_home "$env_file")\""
+            code "$end_if"
+            code "# END configuration from Alice installer"
+        }
+
+        if [ -f "$shell_config" ] && match=$(grep -Hn "$(unsubst_home "$env_file" | sed 's#\$#\\$#')" "$shell_config"); then
+            info "It appears your shell config file ($shell_config) is already set up correctly as it contains the line:"
             echo
-            success "Added Alice setup commands to $shell_config!"
+            info "$match"
             echo
-            info "Restart your terminal for the changes to take effect."
             echo
+            info "Just in case it isn't, here are the lines that need run when your shell starts to initialize Alice:"
+            echo
+            shell_config_code
+            echo
+        else
+            info "To run 'alice' from your terminal, you'll need to add the following lines to your shell config file ($shell_config):"
+            echo
+            shell_config_code
+            echo
+
+            if [ "$should_update_shell_config" = "y" ] || y_or_n "Would you like these lines to be appended to $shell_config?"; then
+                mkdir -p "$(dirname "$shell_config")"
+                shell_config_code >> "$shell_config"
+                echo
+                success "Added Alice setup commands to $shell_config!"
+                echo
+                info "Restart your terminal for the changes to take effect."
+                echo
+            fi
         fi
     fi
 
