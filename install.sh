@@ -475,7 +475,6 @@ main () {
         echo
     fi
 
-    alice_env_call="__alice_env \"$(unsubst_home "$install_root")\""
     shell_config_code() {
         case "$shell_name" in
             fish)
@@ -493,12 +492,11 @@ main () {
         code "$if_installed"
         # Use `.` rather than `source` because the former is more portable.
         code "    . \"$(unsubst_home "$env_file")\""
-        code "    $alice_env_call"
         code "$end_if"
         code "# END configuration from Alice installer"
     }
 
-    if [ -f "$shell_config" ] && match=$(grep -Hn "$(echo "$alice_env_call" | sed 's#\$#\\$#')" "$shell_config"); then
+    if [ -f "$shell_config" ] && match=$(grep -Hn "$(unsubst_home "$env_file" | sed 's#\$#\\$#')" "$shell_config"); then
         info "It appears your shell config file ($shell_config) is already set up correctly as it contains the line:"
         echo
         info "$match"
