@@ -420,7 +420,7 @@ main () {
     echo
 
 
-    if [ "$should_update_shell_config" = "y" ]; then
+    if ! [ "$should_update_shell_config" = "n" ]; then
 
         shell_name=${shell_name:-$(infer_shell_name)}
         env_dir="$install_root/env"
