@@ -1,13 +1,11 @@
 #!/bin/sh
-# This script is meant to be POSIX compatible, to work on as many different systems as possible.
-# Please try to stick to this. Use a tool like shellcheck to validate changes.
 set -eu
 
 # The whole body of the script is wrapped in a function so that a partially
 # downloaded script does not get executed by accident. The function is called
 # at the end.
 main () {
-    dune_bin_git_url="https://github.com/gridbugs/dune-bin"
+    alice_git_url="https://github.com/alicecaml/alice"
 
     # Reset
     Color_Off='\033[0m' # Text Reset
@@ -34,9 +32,9 @@ main () {
     error_download_failed() {
         tar_uri="$1"
         version="$2"
-        print_error "Failed to download Dune archive from \"$tar_uri\""
-        print_error "Check that $version corresponds to a version of Dune with a binary release."
-        print_error "A list of Dune versions with binary releases can be found at: $dune_bin_git_url/releases"
+        print_error "Failed to download Alice archive from \"$tar_uri\""
+        print_error "Check that $version corresponds to a version of Alice with a binary release."
+        print_error "A list of Alice versions with binary releases can be found at: $alice_git_url/releases"
         exit 1
     }
 
@@ -69,32 +67,14 @@ main () {
     }
 
     ensure_command() {
-        command_exists "$1" || error "Failed to find \"$1\". This script needs \"$1\" to be able to install Dune."
+        command_exists "$1" || error "Failed to find \"$1\". This script needs \"$1\" to be able to install Alice."
     }
 
     unsubst_home() {
         echo "$1" | sed -e "s#^$HOME#\$HOME#"
     }
 
-    opam_switch_before_dot_local_bin_in_path() {
-        # The most conventional place to install dune is ~/.local but if
-        # ~/.local/bin is already in the user's PATH variable and the current
-        # opam switch appears in PATH before ~/.local/bin then this will cause
-        # any dune managed by opam to take precedence over the dune installed
-        # by this script, which is likely not what the user intended when they
-        # ran this script. This function detects this case and returns 0 iff
-        # ~/.local/bin is already in PATH and is behind the current opam
-        # switch's bin directory.
-        echo "$PATH" |\
-            tr ':' '\n' |\
-            grep "\(\($HOME\|~\)/\.local/bin\)\|\(\($HOME\|~\)/\.opam\)" |\
-            sed 's#.*opam.*#opam#' |\
-            sed 's#.*local.*#local#' |\
-            paste -sd: - |\
-            grep '^\(opam:\)\+\(local\)' > /dev/null
-    }
-
-    latest_stable_binary_dune_version() {
+    latest_stable_binary_alice_version() {
         ensure_command "git"
         git_url="$1"
         # matches stable version numbers like "1.2.3"
@@ -196,6 +176,29 @@ main () {
         echo "$input"
     }
 
+    y_or_n() {
+        message="$1"
+        while true; do
+            info_bold "$message ([y]/n) >"
+            choice=$(read_checked "$tty")
+            case "$choice" in
+                "")
+                    return 0
+                    ;;
+                y|Y)
+                    return 0
+                    ;;
+                n|N)
+                    return 1
+                    ;;
+                *)
+                    warn "Please enter y or n."
+                    echo
+                    ;;
+            esac
+        done
+    }
+
     exit_message() {
         info_bold "This installer will now exit."
     }
@@ -203,28 +206,28 @@ main () {
     usage() {
         echo "Usage: install.sh [VERSION] [options]"
         echo
-        echo "Install a given version of the Dune binary distribution, or the latest stable version if VERSION is not specified."
-        echo "Existing versions are listed at: $dune_bin_git_url/releases"
+        echo "Install a given version of Alice, or the latest stable version if VERSION is not specified."
+        echo "Existing versions are listed at: $alice_git_url/releases"
         echo "To install an unstable version (such as an alpha version) the version number must be specified explicitly."
         echo
         echo "Options:"
         echo "--help, -h                Print this help message"
-        echo "--install-root PATH       Install Dune to the specified location instead of prompting"
-        echo "--update-shell-config     Always the shell config (e.g. .bashrc) if necessary"
+        echo "--no-prompt               Don't prompt before installing"
+        echo "--update-shell-config     Always update the shell config (e.g. .bashrc) if necessary"
         echo "--no-update-shell-config  Never update the shell config (e.g. .bashrc)"
         echo "--shell-config PATH       Use this file as your shell config when updating the shell config"
         echo "--shell SHELL             One of: bash, zsh, fish, sh. Installer will treat this as your shell. Use 'sh' for minimal posix shells such as ash"
-        echo "--just-print-version      Make no changes to the system. The final line of stdout will be the version of dune that would have been installed"
+        echo "--just-print-version      Make no changes to the system. The final line of stdout will be the version of Alice that would have been installed"
         echo "--no-tty                  Read interactive input from stdin rather than the terminal device (allows automation via yes et al.)"
-        echo "--debug-override-url URL  Download dune tarball from given url (debugging only)"
+        echo "--debug-override-url URL  Download Alice tarball from given url (debugging only)"
         echo "--debug-tarball-dir DIR   Name of root directory inside tarball (debugging only)"
-        echo "--debug-version-repo REPO Override the git repo url used to determine the latest version of dune (debugging only)"
+        echo "--debug-version-repo REPO Override the git repo url used to determine the latest version of Alice (debugging only)"
     }
 
-    install_root=""
     should_update_shell_config=""
     just_print_version="0"
     tty="1"
+    prompt="y"
     while [ "$#" -gt "0" ]; do
         arg="$1"
         shift
@@ -233,19 +236,8 @@ main () {
                 usage
                 exit 0
                 ;;
-            --install-root)
-                if [ "$#" -eq "0" ]; then
-                    error "--install-root must be passed an argument"
-                fi
-                install_root="$1"
-                shift
-                case "$install_root" in
-                    /*)
-                        ;;
-                    *)
-                        error "--install-root must be passed an absolute path (got \"$install_root\")"
-                        ;;
-                esac
+            --no-prompt)
+                prompt="n"
                 ;;
             --update-shell-config)
                 should_update_shell_config="y"
@@ -310,29 +302,29 @@ main () {
                 if [ -z "${version+x}" ]; then
                     version="$arg"
                 else
-                    error "Expected single anonymous argument (the Dune version) but got multiple: $version, $arg"
+                    error "Expected single anonymous argument (the Alice version) but got multiple: $version, $arg"
                 fi
                 ;;
         esac
     done
 
     echo
-    info_bold "Welcome to the Dune installer!"
+    info_bold "Welcome to the Alice installer!"
     echo
 
     if [ -z "${version+x}" ]; then
         echo
-        info "No Dune version was specified, so the installer will check the latest binary release of Dune..."
+        info "No Alice version was specified, so the installer will check the latest stable version with a binary release..."
         echo
-        version=$(latest_stable_binary_dune_version "${debug_version_repo:-"$dune_bin_git_url"}")
+        version=$(latest_stable_binary_alice_version "${debug_version_repo:-"$alice_git_url"}")
         echo
-        info "The latest binary release of Dune was found to be $version."
+        info "The latest release of Alice was found to be $version."
         echo
     fi
 
     if [ "$just_print_version" = "1" ]; then
         echo
-        info "Exiting due to --just-print-version. Would install Dune version:"
+        info "Exiting due to --just-print-version. Would install Alice version:"
         echo
         echo "$version"
         exit
@@ -340,87 +332,40 @@ main () {
 
     case $(uname -ms) in
         'Darwin x86_64')
-            target=x86_64-apple-darwin
+            target=x86_64-macos
             ;;
         'Darwin arm64')
-            target=aarch64-apple-darwin
+            target=aarch64-macos
             ;;
         'Linux x86_64')
-            target=x86_64-unknown-linux-musl
+            target=x86_64-linux-musl-static
             ;;
         *)
-            error "The Dune installation script does not currently support $(uname -ms)."
+            error "The Alice installation script does not currently support $(uname -ms)."
     esac
-    tarball="dune-$version-$target.tar.gz"
-    tar_uri=${debug_override_url:-"$dune_bin_git_url/releases/download/$version/$tarball"}
+    tarball="alice-$version-$target.tar.gz"
+    tar_uri=${debug_override_url:-"$alice_git_url/releases/download/$version/$tarball"}
     # The tarball is expected to contain a single directory with this name:
-    tarball_dir=${debug_tarball_dir:-"dune-$version-$target"}
+    tarball_dir=${debug_tarball_dir:-"alice-$version-$target"}
 
     ensure_command "tar"
     ensure_command "gzip"
     ensure_command "curl"
 
     echo
-    printf "This will guide you through the installation of %bDune %s%b."  "$Bold_White" "$version" "$Color_Off"
-    echo
+    printf "This will guide you through the installation of %bAlice v%s%b."  "$Bold_White" "$version" "$Color_Off"
     echo
 
-    if [ -z "$install_root" ]; then
-        install_root_local="$HOME/.local"
-        install_root_dune="$HOME/.dune"
-        if opam_switch_before_dot_local_bin_in_path; then
-            warn "Your current opam switch is earlier in your \$PATH than Dune's recommended install location. This installer would normally recommend installing Dune to $install_root_local however in your case this would cause the Dune executable from your current opam switch to take precedent over the Dune installed by this installer. This installer will proceed with an alternative default installation directory $install_root_dune which you are free to override."
-            echo
-            default_install_root="$install_root_dune"
-            install_root_local_message=""
-            install_root_dune_message=" (recommended)"
-        else
-            default_install_root="$install_root_local"
-            install_root_local_message=" (recommended)"
-            install_root_dune_message=""
-        fi
+    install_root="$HOME/.alice"
+
+    echo
+    if [ "$prompt" = "y" ] && ! y_or_n "Alice v$version will now be installed to '$install_root'. Proceed?"; then
+        exit_message
+        exit 0
     fi
-
-    while [ -z "$install_root" ]; do
-        info "Where would you like to install Dune? (enter index number or custom absolute path or leave blank for default)"
-        echo
-        info "1) $install_root_local$install_root_local_message"
-        echo
-        info "2) $install_root_dune$install_root_dune_message"
-        echo
-        info_bold "[$default_install_root] >"
-        choice=$(read_checked "$tty")
-        case "$choice" in
-            "")
-                install_root=$default_install_root
-                ;;
-            1)
-                install_root=$install_root_local
-                ;;
-            2)
-                install_root=$install_root_dune
-                ;;
-            /*)
-                install_root=$choice
-                ;;
-            '~'/*)
-                install_root=$(echo "$choice" | sed "s#~#$HOME#")
-                echo
-                warn "Expanding $choice to $install_root"
-                ;;
-            *)
-                echo
-                warn "Unrecognized choice: $choice"
-                echo
-                ;;
-        esac
-    done
-
-    echo
-    info "Dune $version will now be installed to $install_root"
     echo
 
-    tmp_dir="$(mktemp -d -t dune-install.XXXXXXXX)"
+    tmp_dir="$(mktemp -d -t alice-install.XXXXXXXX)"
     trap 'rm -rf "$tmp_dir"' EXIT
 
     # Determine whether we can use --no-same-owner to force tar to extract with user permissions.
@@ -445,15 +390,15 @@ main () {
         error_download_failed "$tar_uri" "$version"
 
     tar -xf "$tmp_tar" -C "$tmp_dir" "$tar_owner" > /dev/null 2>&1 ||
-        error "Failed to extract Dune archive content from \"$tmp_tar\""
+        error "Failed to extract archive content from \"$tmp_tar\""
 
-    mkdir -p "$install_root"
+    mkdir -p "$install_root/alice"
     for d in "$tmp_dir/$tarball_dir"/*; do
-        cp -rf "$d" "$install_root"
+        cp -rf "$d" "$install_root/alice"
     done
 
     echo
-    success "Dune successfully installed to $install_root!"
+    success "Alice successfully installed to $install_root!"
     echo
     echo
 
@@ -467,58 +412,28 @@ main () {
     fi
 
     shell_name=${shell_name:-$(infer_shell_name)}
-    env_dir="$install_root/share/dune/env"
-    remove_opam_precmd_hook_posix="PROMPT_COMMAND=\"\$(echo \"\$PROMPT_COMMAND\" | tr ';' '\\n' | grep -v _opam_env_hook | paste -sd ';' -)\""
+    env_dir="$install_root/env"
     case "$shell_name" in
         sh|ash|dash)
             shell_config_inferred="${shell_config:-$HOME/.profile}"
             env_file="$env_dir/env.sh"
-            remove_opam_precmd_hook=$remove_opam_precmd_hook_posix
             ;;
         bash)
-            bash_config_candidates="$HOME/.profile $HOME/.bash_profile $HOME/.bashrc"
-            if [ "${XDG_CONFIG_HOME:-}" ]; then
-                bash_config_candidates="$bash_config_candidates $XDG_CONFIG_HOME/profile $XDG_CONFIG_HOME/.profile $XDG_CONFIG_HOME/bash_profile $XDG_CONFIG_HOME/.bash_profile $XDG_CONFIG_HOME/bashrc $XDG_CONFIG_HOME/.bashrc"
-            fi
-            # When opam is initialized for a user using bash as their shell it adds
-            # its configuration to ~/.profile by default. It's possible that users
-            # manually specified a different bash config file such as ~/.bashrc or
-            # ~/.bash_profile. Also some users may have moved the opam
-            # configuration from one bash config file to another. It's necessary
-            # that Dune's configuration be evaluated after opam's configuration. If
-            # users have multiple different bash configurations present (it's quite
-            # common to have both ~/.profile and ~/.bashrc with one sourcing the
-            # other, for example), one way to make sure Dune is initialized after
-            # opam is to append the Dune configuration to the end of which ever
-            # bash config file also contains opam's configuration. This function
-            # chooses the bash config file to add Dune's configuration to by
-            # searching for a file containing Opam's configuration already, and
-            # will select ~/.profile by default to match the behaviour of opam.
-            for config in $bash_config_candidates; do
-                if test -f "$config" && match=$(grep -Hn '\.opam/opam-init/init\.sh' "$config") ; then
-                    shell_config_with_opam_init="$config"
-                    bash_opam_init_match=$match
-                    break
-                fi
-            done
-            shell_config_inferred="${shell_config_with_opam_init:-$HOME/.profile}"
+            shell_config_inferred="${shell_config:-$HOME/.profile}"
             env_file="$env_dir/env.bash"
-            remove_opam_precmd_hook=$remove_opam_precmd_hook_posix
             ;;
         zsh)
             env_file="$env_dir/env.zsh"
             shell_config_inferred="$HOME/.zshrc"
-            remove_opam_precmd_hook="autoload -Uz add-zsh-hook; add-zsh-hook -d precmd _opam_env_hook"
             ;;
         fish)
             env_file="$env_dir/env.fish"
             shell_config_inferred="$HOME/.config/fish/config.fish"
-            remove_opam_precmd_hook="functions --erase __opam_env_export_eval"
             ;;
         *)
             info "The install script does not recognize your shell ($shell_name)."
             echo
-            info "It's up to you to ensure $install_root/bin is in your \$PATH variable."
+            info "It's up to you to ensure $install_root/alice/bin is in your \$PATH variable."
             echo
             exit_message
             echo
@@ -527,21 +442,11 @@ main () {
     esac
 
     if [ -z "${shell_config+x}" ]; then
-        info "The installer can modify your shell config file to set up your environment for running dune from your terminal."
+        info "The installer can modify your shell config file to set up your environment for running 'alice' from your terminal."
         echo
         info "The installer has inferred that your shell is: $shell_name. If this is incorrect, rerun the installer with --shell."
         echo
-        if [ -z "${bash_opam_init_match+x}" ]; then
-            info "Based on your shell ($shell_name) the installer has inferred that your shell config file is: $shell_config_inferred"
-        else
-            info "Your shell is bash and the installer found an existing shell configuration for opam in $shell_config_inferred at:"
-            echo
-            echo
-            info "$bash_opam_init_match"
-            echo
-            echo
-            info "It's recommended to add Dune's configuration to the same file as the existing opam configuration."
-        fi
+        info "Based on your shell ($shell_name) the installer has inferred that your shell config file is: $shell_config_inferred"
         echo
         while [ -z "${shell_config+x}" ]; do
             echo
@@ -570,7 +475,7 @@ main () {
         echo
     fi
 
-    dune_env_call="__dune_env \"$(unsubst_home "$install_root")\""
+    alice_env_call="__alice_env \"$(unsubst_home "$install_root")\""
     shell_config_code() {
         case "$shell_name" in
             fish)
@@ -584,28 +489,22 @@ main () {
         esac
 
         code ""
-        code "# BEGIN configuration from Dune installer"
-        code "# This configuration must be placed after any opam configuration in your shell config file."
-        code "# This performs several tasks to configure your shell for Dune:"
-        code "#   - makes sure the dune executable is available in your \$PATH"
-        code "#   - registers shell completions for dune if completions are available for your shell"
-        code "#   - removes opam's pre-command hook because it would override Dune's shell configuration"
+        code "# BEGIN configuration from Alice installer"
         code "$if_installed"
         # Use `.` rather than `source` because the former is more portable.
         code "    . \"$(unsubst_home "$env_file")\""
-        code "    $dune_env_call"
-        code "    $remove_opam_precmd_hook # remove opam's pre-command hook"
+        code "    $alice_env_call"
         code "$end_if"
-        code "# END configuration from Dune installer"
+        code "# END configuration from Alice installer"
     }
 
-    if [ -f "$shell_config" ] && match=$(grep -Hn "$(echo "$dune_env_call" | sed 's#\$#\\$#')" "$shell_config"); then
+    if [ -f "$shell_config" ] && match=$(grep -Hn "$(echo "$alice_env_call" | sed 's#\$#\\$#')" "$shell_config"); then
         info "It appears your shell config file ($shell_config) is already set up correctly as it contains the line:"
         echo
         info "$match"
         echo
         echo
-        info "Just in case it isn't, here are the lines that need run when your shell starts to initialize Dune:"
+        info "Just in case it isn't, here are the lines that need run when your shell starts to initialize Alice:"
         echo
         shell_config_code
         echo
@@ -614,44 +513,20 @@ main () {
         exit 0
     fi
 
-    info "To run dune from your terminal, you'll need to add the following lines to your shell config file ($shell_config):"
+    info "To run 'alice' from your terminal, you'll need to add the following lines to your shell config file ($shell_config):"
     echo
     shell_config_code
     echo
 
-    while [ -z "$should_update_shell_config" ]; do
-        info_bold "Would you like these lines to be appended to $shell_config? ([y]/n) >"
-        choice=$(read_checked "$tty")
-        case "$choice" in
-            "")
-                should_update_shell_config="y"
-                ;;
-            y|Y)
-                should_update_shell_config="y"
-                ;;
-            n|N)
-                should_update_shell_config="n"
-                ;;
-            *)
-                warn "Please enter y or n."
-                echo
-                ;;
-        esac
-    done
-
-    case "$should_update_shell_config" in
-        y)
-            mkdir -p "$(dirname "$shell_config")"
-            shell_config_code >> "$shell_config"
-            echo
-            success "Added Dune setup commands to $shell_config!"
-            echo
-            info "Restart your terminal for the changes to take effect."
-            echo
-            ;;
-        *)
-        ;;
-    esac
+    if [ "$should_update_shell_config" = "y" ] || y_or_n "Would you like these lines to be appended to $shell_config?"; then
+        mkdir -p "$(dirname "$shell_config")"
+        shell_config_code >> "$shell_config"
+        echo
+        success "Added Alice setup commands to $shell_config!"
+        echo
+        info "Restart your terminal for the changes to take effect."
+        echo
+    fi
 
     exit_message
     echo
