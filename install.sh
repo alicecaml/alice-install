@@ -200,7 +200,7 @@ main () {
     }
 
     exit_message() {
-        info_bold "This installer will now exit. Restart your shell to get access to new commands."
+        info_bold "This installer will now exit."
     }
 
     usage() {
@@ -212,6 +212,7 @@ main () {
         echo
         echo "Options:"
         echo "--help, -h                Print this help message"
+        echo "--global PATH             Install Alice and development tools to PATH instead of installing under ~/.alice"
         echo "--no-prompt               Don't prompt before installing"
         echo "--install-tools           Install OCaml development tools"
         echo "--no-install-tools        Don't install OCaml development tools"
@@ -240,6 +241,13 @@ main () {
             -h|--help)
                 usage
                 exit 0
+                ;;
+            --global)
+                if [ "$#" -eq "0" ]; then
+                    error "--global must be passed an argument"
+                fi
+                global="$1"
+                shift
                 ;;
             --no-prompt)
                 prompt="n"
@@ -370,7 +378,11 @@ main () {
     printf "This will guide you through the installation of %bAlice v%s%b."  "$Bold_White" "$version" "$Color_Off"
     echo
 
-    install_root="$HOME/.alice"
+    if [ -z "${global+x}" ]; then
+        install_root="$HOME/.alice/alice"
+    else
+        install_root="$global"
+    fi
 
     echo
     if [ "$prompt" = "y" ] && ! y_or_n "Alice v$version will now be installed to '$install_root'. Proceed?"; then
@@ -406,13 +418,13 @@ main () {
     tar -xf "$tmp_tar" -C "$tmp_dir" "$tar_owner" > /dev/null 2>&1 ||
         error "Failed to extract archive content from \"$tmp_tar\""
 
-    mkdir -p "$install_root/alice"
+    mkdir -p "$install_root"
     for d in "$tmp_dir/$tarball_dir"/*; do
-        cp -rf "$d" "$install_root/alice"
+        cp -rf "$d" "$install_root"
     done
 
     # Run alice itself to install some extra scripts.
-    "$install_root/alice/bin/alice" internal setup
+    "$install_root/bin/alice" internal setup
 
     echo
     success "Alice successfully installed to $install_root!"
@@ -423,7 +435,7 @@ main () {
     if ! [ "$should_update_shell_config" = "n" ]; then
 
         shell_name=${shell_name:-$(infer_shell_name)}
-        env_dir="$install_root/env"
+        env_dir="$HOME/.alice/env"
         case "$shell_name" in
             sh|ash|dash)
                 shell_config_inferred="${shell_config:-$HOME/.profile}"
@@ -444,7 +456,7 @@ main () {
             *)
                 info "The install script does not recognize your shell ($shell_name)."
                 echo
-                info "It's up to you to ensure $install_root/alice/bin is in your \$PATH variable."
+                info "It's up to you to ensure $install_root/bin is in your \$PATH variable."
                 echo
                 exit_message
                 echo
@@ -536,14 +548,21 @@ main () {
     fi
 
     if ! [ "$install_tools" = "n" ] && ([ "$install_tools" = "y" ] || y_or_n "Would you like to install the OCaml compiler, ocamllsp, and ocamlformat?"); then
-        echo "Alice will now install tools to '$install_root/current/bin'..."
-        if [ "$install_compiler_only" = "y" ]; then
-            "$install_root/alice/bin/alice" tools get --compiler-only
+        if [ -z "${global+x}" ]; then
+            echo "Installing tools to '$HOME/.alice/current'..."
+            global_arg=""
         else
-            "$install_root/alice/bin/alice" tools get
+            echo "Installing tools to '$global'..."
+            global_arg="--global=$global"
+        fi
+        if [ "$install_compiler_only" = "y" ]; then
+            "$install_root/bin/alice" tools install --compiler-only "$global_arg"
+        else
+            "$install_root/bin/alice" tools install "$global_arg"
         fi
     fi
 
+    echo "Restart your shell to get access to new commands."
     exit_message
     echo
 }
