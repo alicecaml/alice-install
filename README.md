@@ -2,5 +2,5 @@
 
 Install Alice with:
 ```
-curl -4fsSL https://github.com/alicecaml/alice-install/releases/download/v0/install.sh | sh
+curl -fsSL https://github.com/alicecaml/alice-install/releases/download/v1/install.sh | sh
 ```
