@@ -556,9 +556,9 @@ main () {
             global_arg="--global=$global"
         fi
         if [ "$install_compiler_only" = "y" ]; then
-            "$install_root/bin/alice" tools install --compiler-only "$global_arg"
+            eval "$install_root/bin/alice tools install --compiler-only $global_arg"
         else
-            "$install_root/bin/alice" tools install "$global_arg"
+            eval "$install_root/bin/alice tools install $global_arg"
         fi
     fi
 
