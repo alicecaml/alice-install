@@ -362,6 +362,9 @@ main () {
         'Linux x86_64')
             target=x86_64-linux-musl-static
             ;;
+        'Linux aarch64')
+            target=aarch64-linux-musl-static
+            ;;
         *)
             error "The Alice installation script does not currently support $(uname -ms)."
     esac
