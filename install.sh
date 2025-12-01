@@ -550,7 +550,7 @@ main () {
         fi
     fi
 
-    if ! [ "$install_tools" = "n" ] && ([ "$install_tools" = "y" ] || y_or_n "Would you like to install the OCaml compiler, ocamllsp, and ocamlformat?"); then
+    if ! [ "$install_tools" = "n" ] && ([ "$install_tools" = "y" ] || y_or_n "Would you like to install the OCaml compiler and development tools?"); then
         if [ -z "${global+x}" ]; then
             echo "Installing tools to '$HOME/.alice/current'..."
             global_arg=""
