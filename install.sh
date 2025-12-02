@@ -212,7 +212,7 @@ main () {
         echo
         echo "Options:"
         echo "--help, -h                Print this help message"
-        echo "--global PATH             Install Alice and development tools to PATH instead of installing under ~/.alice"
+        echo "--global PATH             Install Alice and development tools to PATH instead of the default location"
         echo "--no-prompt               Don't prompt before installing"
         echo "--install-tools           Install OCaml development tools"
         echo "--no-install-tools        Don't install OCaml development tools"
@@ -381,8 +381,11 @@ main () {
     printf "This will guide you through the installation of %bAlice v%s%b."  "$Bold_White" "$version" "$Color_Off"
     echo
 
+    BIN_DIR="$HOME/.local/bin"
+    DATA_DIR="${XDG_DATA_HOME:-"$HOME/.local/share"}/alice"
+
     if [ -z "${global+x}" ]; then
-        install_root="$HOME/.alice/alice"
+        install_root="$BIN_DIR/alice"
     else
         install_root="$global"
     fi
@@ -438,7 +441,7 @@ main () {
     if ! [ "$should_update_shell_config" = "n" ]; then
 
         shell_name=${shell_name:-$(infer_shell_name)}
-        env_dir="$HOME/.alice/env"
+        env_dir="$DATA_DIR/env"
         case "$shell_name" in
             sh|ash|dash)
                 shell_config_inferred="${shell_config:-$HOME/.profile}"
@@ -552,7 +555,7 @@ main () {
 
     if ! [ "$install_tools" = "n" ] && ([ "$install_tools" = "y" ] || y_or_n "Would you like to install the OCaml compiler and development tools?"); then
         if [ -z "${global+x}" ]; then
-            echo "Installing tools to '$HOME/.alice/current'..."
+            echo "Installing tools to '$DATA_DIR'..."
             global_arg=""
         else
             echo "Installing tools to '$global'..."
