@@ -381,11 +381,11 @@ main () {
     printf "This will guide you through the installation of %bAlice v%s%b."  "$Bold_White" "$version" "$Color_Off"
     echo
 
-    BIN_DIR="$HOME/.local/bin"
+    LOCAL_INSTALL_ROOT="$HOME/.local"
     DATA_DIR="${XDG_DATA_HOME:-"$HOME/.local/share"}/alice"
 
     if [ -z "${global+x}" ]; then
-        install_root="$BIN_DIR/alice"
+        install_root="$LOCAL_INSTALL_ROOT"
     else
         install_root="$global"
     fi
