@@ -445,12 +445,12 @@ main () {
         env_dir="$DATA_DIR/env"
         case "$shell_name" in
             sh|ash|dash)
-                shell_config_inferred="${shell_config:-$HOME/.profile}"
                 env_file="$env_dir/env.sh"
+                shell_config_inferred="$HOME/.profile"
                 ;;
             bash)
-                shell_config_inferred="${shell_config:-$HOME/.profile}"
                 env_file="$env_dir/env.bash"
+                shell_config_inferred="$HOME/.bashrc"
                 ;;
             zsh)
                 env_file="$env_dir/env.zsh"
