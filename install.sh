@@ -393,6 +393,7 @@ main () {
     echo
     if [ "$prompt" = "y" ] && ! y_or_n "Alice v$version will now be installed to '$install_root'. Proceed?"; then
         exit_message
+        echo
         exit 0
     fi
     echo
